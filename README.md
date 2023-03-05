@@ -1,8 +1,8 @@
 # Nessus to Opensearch
-Export Nessus scans results to an Opensearch server to create dashboards, create custom alerts, and simplify vulnerability monitoring.
+Export Nessus scans results to Opensearch server for create dashboards, create custom alerts, and simplify vulnerability monitoring.
 
 ### Requirements
-- Python (tested with Python 3.11 +)
+- Python (tested with Python 3.11+)
 - Nessus scanner (tested with Nessus 10+)
 - Opensearch Server and Dashboard (tested with Opensearch 2.x)
 
