@@ -5,6 +5,7 @@ from re import search
 from time import time
 from json import dumps
 from posixpath import join as urljoin
+from socket import getfqdn
 from requests import packages, get, post
 from datetime import datetime
 from dotenv import load_dotenv
@@ -15,11 +16,6 @@ packages.urllib3.disable_warnings()
 
 log_file = 'nessus_log.txt'
 timestamp_file = 'nessus_timestamp.txt'
-
-def write_log(log_msg: str) -> None:
-    """ Write log message """
-    with open(log_file, 'a') as f:
-        f.write(log_msg)
 
 ##########
 # Nessus #
@@ -206,6 +202,21 @@ def append_data_opensearch(opensearch: OpenSearch, index_name: str, scans_data: 
     except Exception as e:
             write_log('append_data_opensearch() | index: %s | Error: %s' % (index_name, e) + '\n')
 
+#########
+# Utils #
+#########
+def write_log(log_msg: str) -> None:
+    """ Write log message """
+    with open(log_file, 'a') as f:
+        f.write(log_msg)
+
+def reverse_dns(ip_addr: str) -> str:
+    """Perform a reverse DNS lookup """
+    try:
+        return getfqdn(ip_addr)
+    except OSError:
+        return ip_addr
+
 def main() -> None:
     """ Main """
     NESSUS_URL = getenv("NESSUS_URL")
@@ -216,6 +227,8 @@ def main() -> None:
     OPENSEARCH_PORT = getenv("OPENSEARCH_PORT")  
     OPENSEARCH_USER = getenv("OPENSEARCH_USER")
     OPENSEARCH_PASSWORD = getenv("OPENSEARCH_PASSWORD")
+
+    REVERSE_DNS = getenv("REVERSE_DNS")
 
     token = nessus_login(NESSUS_URL, NESSUS_USERNAME, NESSUS_PASSWORD)
     x_token = get_x_api_token(NESSUS_URL, token)
@@ -234,29 +247,33 @@ def main() -> None:
                     for host in scan_result["hosts"]:
                         host_details = {}
                         host_details = get_host_details(NESSUS_URL, token, x_token, scan["id"], host["host_id"])
+                        if(REVERSE_DNS == "true"):
+                            host_fqdn = reverse_dns(host_details["info"]["host-ip"])
                         ## Opensearch dashboard doesn't support nested object visualisation, so for each vulnerability we create an entry ...
                         ## https://github.com/opensearch-project/OpenSearch-Dashboards/issues/657
                         for vuln in host_details["vulnerabilities"]:
                             data = {}
                             # Scan infos
-                            data["@timestamp"]       = timestamp_to_iso_format(scan_result["info"]["scan_end"])   # ISO format is use to be compliante with Opensearch dynamic field mapping
-                            data["scan_start"]       = timestamp_to_iso_format(scan_result["info"]["scan_start"])
-                            data["scan_end"]         = timestamp_to_iso_format(scan_result["info"]["scan_end"])
-                            data["scan_name"]        = scan_result["info"]["name"]
-                            data["scan_targets"]     = scan_result["info"]["targets"]
-                            data["scan_policy"]      = scan_result["info"]["policy"]
+                            data["@timestamp"]         = timestamp_to_iso_format(scan_result["info"]["scan_end"])   # ISO format is use to be compliante with Opensearch dynamic field mapping
+                            data["scan_start"]         = timestamp_to_iso_format(scan_result["info"]["scan_start"])
+                            data["scan_end"]           = timestamp_to_iso_format(scan_result["info"]["scan_end"])
+                            data["scan_name"]          = scan_result["info"]["name"]
+                            data["scan_targets"]       = scan_result["info"]["targets"]
+                            data["scan_policy"]        = scan_result["info"]["policy"]
                             # Host infos
-                            data["host_start"]       = nessus_date_to_iso_format(host_details["info"]["host_start"])
-                            data["host_end"]         = nessus_date_to_iso_format(host_details["info"]["host_end"])
-                            data["host_ip"]          = host_details["info"]["host-ip"]
+                            data["host_start"]         = nessus_date_to_iso_format(host_details["info"]["host_start"])
+                            data["host_end"]           = nessus_date_to_iso_format(host_details["info"]["host_end"])
+                            data["host_ip"]            = host_details["info"]["host-ip"]
+                            if(REVERSE_DNS == "true"): 
+                                data["host_fqdn"]      = host_fqdn
                             # Vulnerability infos
-                            data["plugin_count"]     = vuln["count"]
-                            data["plugin_score"]     = vuln_score_decode(vuln["score"])
-                            data["plugin_severity"]  = vuln_severity_decode(vuln["severity"])
-                            data["plugin_name"]      = vuln["plugin_name"]
-                            data["plugin_id"]        = str(vuln["plugin_id"])
-                            data["plugin_family"]    = vuln["plugin_family"]
-                            data["plugin_name"]      = vuln["plugin_name"]
+                            data["plugin_count"]       = vuln["count"]
+                            data["plugin_score"]       = vuln_score_decode(vuln["score"])
+                            data["plugin_severity"]    = vuln_severity_decode(vuln["severity"])
+                            data["plugin_name"]        = vuln["plugin_name"]
+                            data["plugin_id"]          = str(vuln["plugin_id"])
+                            data["plugin_family"]      = vuln["plugin_family"]
+                            data["plugin_name"]        = vuln["plugin_name"]
     
                             result_all_scans.append(data)
 
