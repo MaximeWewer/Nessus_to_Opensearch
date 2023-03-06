@@ -60,38 +60,17 @@ def get_scans_list(url: str, token: str, x_token: str, last_timestamp_query: int
     """ Get lits of scans """
     headers = {"X-Cookie": "token={}".format(token), "X-API-Token": x_token, 'Accept': 'application/json'}
     params = {"last_modification_date": last_timestamp_query}
-    try:
-        response = get(urljoin(url, f"scans/"), headers=headers, params=params, verify=False)
-        if response.status_code == 200:
-            return response.json()
-        else:
-            write_log('get_scans_list() | reponse code: %s | Error: %s' % (response.status_code, response.json()) + '\n')
-    except Exception as e:
-        write_log('get_scans_list() | Error: %s' % (e) + '\n')
+    return get_request(function="get_scans_list()", url=urljoin(url, f"scans/"), headers=headers, params=params, verify=False)
 
 def get_scan(url: str, token: str, x_token: str, scan_id: int) -> dict:
     """ Get scan data """
     headers = {"X-Cookie": "token={}".format(token), "X-API-Token": x_token, "Accept": "application/json"}
-    try:
-        response = get(urljoin(url, f"scans/{scan_id}"), headers=headers, verify=False)
-        if response.status_code == 200:
-            return response.json()
-        else:
-            write_log('get_scan() | reponse code: %s | Error: %s' % (response.status_code, response.json()) + '\n')
-    except Exception as e:
-        write_log('get_scan() | Error: %s' % (e) + '\n')
+    return get_request(function="get_scan()", url=urljoin(url, f"scans/{scan_id}"), headers=headers, params=None, verify=False)
 
 def get_host_details(url: str, token: str, x_token: str, scan_id: int, host_id: int) -> dict:
     """ Get host detail """
     headers = {"X-Cookie": "token={}".format(token), "X-API-Token": x_token, "Accept": "application/json"}
-    try:
-        response = get(urljoin(url, f"scans/{scan_id}/hosts/{host_id}"), headers=headers, verify=False)
-        if response.status_code == 200:
-            return response.json()
-        else:
-            write_log('get_host_details() | reponse code: %s | Error: %s' % (response.status_code, response.json()) + '\n')
-    except Exception as e:
-        write_log('get_host_details() | Error: %s' % (e) + '\n')
+    return get_request(function="get_host_details()", url=urljoin(url, f"scans/{scan_id}/hosts/{host_id}"), headers=headers, params=None, verify=False)
 
 def get_last_timestamp_query() -> int:
     """ Get last timestamp when we have made query to not get list of all scans """
@@ -120,7 +99,7 @@ def vuln_severity_decode(vuln_severity: int) -> str:
     elif(vuln_severity == 4):
         return "critical"
     else:
-        return None
+        return "code error: " + str(vuln_severity)
 
 #############
 # Timestamp #
@@ -210,8 +189,19 @@ def write_log(log_msg: str) -> None:
     with open(log_file, 'a') as f:
         f.write(log_msg)
 
+def get_request(function: str, url: str, headers: dict, params: dict | None, verify: bool) -> dict:
+    """ Generic GET request to get scan infos """
+    try:
+        response = get(url, headers=headers, params=params, verify=verify)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            write_log('%s | reponse code: %s | Error: %s' % (function, response.status_code, response.json()) + '\n')
+    except Exception as e:
+        write_log('%s | Error: %s' % (function, e) + '\n')
+
 def reverse_dns(ip_addr: str) -> str:
-    """Perform a reverse DNS lookup """
+    """ Perform a reverse DNS lookup """
     try:
         return getfqdn(ip_addr)
     except OSError:
