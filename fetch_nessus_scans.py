@@ -72,13 +72,6 @@ def get_host_details(url: str, token: str, x_token: str, scan_id: int, host_id: 
     headers = {"X-Cookie": "token={}".format(token), "X-API-Token": x_token, "Accept": "application/json"}
     return get_request(function="get_host_details()", url=urljoin(url, f"scans/{scan_id}/hosts/{host_id}"), headers=headers, params=None, verify=False)
 
-def get_last_timestamp_query() -> int:
-    """ Get last timestamp when we have made query to not get list of all scans """
-    cur_timestamp = current_timestamp()
-    prev_timestamp = read_previous_timestamp()
-    write_current_timestamp(cur_timestamp)
-    return prev_timestamp
-
 def vuln_score_decode(vuln_score: str | None) -> float:
     """ Convert score str to float """
     if(vuln_score is not None):
@@ -104,6 +97,13 @@ def vuln_severity_decode(vuln_severity: int) -> str:
 #############
 # Timestamp #
 #############
+def get_last_timestamp_query() -> int:
+    """ Get last timestamp when we have made query to not get list of all scans """
+    cur_timestamp = current_timestamp()
+    prev_timestamp = read_previous_timestamp()
+    write_current_timestamp(cur_timestamp)
+    return prev_timestamp
+
 def read_previous_timestamp() -> int:
     """ Read the timestamp to the file """
     if path.exists(timestamp_file):
@@ -171,7 +171,7 @@ def build_index_name(dest_index_pattern: str) -> str:
 def append_data_opensearch(opensearch: OpenSearch, index_name: str, scans_data: list) -> None:
     """ Append scans results to Opensearch """
     try:
-        ### bulk API - https://github.com/opensearch-project/opensearch-py/blob/main/USER_GUIDE.md#adding-documents-in-bulk
+        ### bulk API - https://github.com/opensearch-project/opensearch-py/blob/main/guides/bulk.md
         bulk_body = ""
         for scan in scans_data:
             bulk_body += f'{{"index": {{"_index": "{index_name}"}}}}\n'
@@ -267,7 +267,6 @@ def main() -> None:
     
                             result_all_scans.append(data)
 
-        # print(dumps(result_all_scans))
         if(result_all_scans):
             opensearch = opensearch_login(OPENSEARCH_HOST, OPENSEARCH_PORT, OPENSEARCH_USER, OPENSEARCH_PASSWORD)
             index_name = build_index_name(getenv("OPENSEARCH_INDEX_NAME")) # Choose your policy for index naming
